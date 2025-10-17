@@ -1,0 +1,11 @@
+node_modules
+client/node_modules
+client/dist
+client/.angular
+client/.vscode
+.git
+.vscode
+Dockerfile
+cloudbuild.yaml
+README.md
+*.log
