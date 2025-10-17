@@ -1,0 +1,206 @@
+<h2>Play Chess</h2>
+<button (click)="logout()">Logout</button>
+<button (click)="goToHistory()">View History</button>
+<!-- Connection signal indicator -->
+<div class="conn-indicator" title="Connection status">
+  <div class="bars">
+    <span class="bar b1"></span>
+    <span class="bar b2"></span>
+    <span class="bar b3"></span>
+    <span class="bar b4"></span>
+  </div>
+</div>
+
+<!-- Profile -->
+<div *ngIf="profile" class="profile-card">
+  <h3>Profile</h3>
+  <p><strong>Email:</strong> {{ profile.email }}</p>
+  <p><strong>Elo:</strong> {{ profile.elo }}</p>
+  <button style="background-color: red;" (click)="deleteAccount()">Delete Account</button>
+</div>
+
+<!-- Private Room -->
+<div *ngIf="!connected && !loadingInGameCheck" class="private-room">
+  <h3>Private Room</h3>
+<input [(ngModel)]="roomId" placeholder="Enter Room ID" />
+<button (click)="onCreateRoomClick()">Create Room</button>
+<button (click)="joinRoom()">Join Room</button>
+
+
+<div *ngIf="showRatedChoice" style="margin-top: 0.5em;">
+  <label>
+    <input type="radio" name="ratedChoice" (change)="setRated(1)" [checked]="isRated === 1" />
+    Rated
+  </label>
+  <label style="margin-left: 1em;">
+    <input type="radio" name="ratedChoice" (change)="setRated(0)" [checked]="isRated === 0" />
+    Unrated
+  </label>
+</div>
+
+<!-- Step 2: show "Create Game" button only after a choice is made -->
+<div *ngIf="showRatedChoice && isRated !== null" style="margin-top: 0.5em;">
+  <button (click)="createRoom()">Create Game</button>
+</div>
+</div>
+
+<!-- Find Match -->
+<div *ngIf="showFindMatch && !loadingInGameCheck" class="find-match">
+  <label>Time: 
+    <select [(ngModel)]="timeControl">
+      <option value="1">1 min</option>
+      <option value="5">5 min</option>
+      <option value="10">10 min</option>
+    </select>
+  </label>
+  <button (click)="play()">Find Match</button>
+</div>
+
+<!-- Pass & Play -->
+<div *ngIf="!connected && !loadingInGameCheck" class="pass-play">
+  <h3>Pass & Play</h3>
+  <button (click)="startPassAndPlay()">Start Local Game</button>
+</div>
+
+<!-- Loading Overlay -->
+<div *ngIf="loadingInGameCheck" class="loading-overlay">
+  <p>Checking game status...</p>
+  <button (click)="reload()">Reload</button>
+</div>
+
+<!-- Game Area -->
+<div *ngIf="connected || localGame" class="game-area">
+ <!-- Captured Pieces -->
+
+<div class="captured-pieces"
+  style="margin: 1em 0; font-size: 18px;  padding: 0.5em; display:block;">
+
+  <!-- White's captured pieces -->
+  <div *ngIf="capturedWhiteIcons.length" style="margin-bottom: 0.5em; display:block;background-color: white;">
+    <strong>White's captured:</strong>
+    <div style="margin-top: 0.25em;">
+      <span *ngFor="let icon of capturedWhiteIcons" style="font-size: 2em; margin: 0 4px;background-color: white;">{{ icon }}</span>
+      <span *ngIf="capturedWhiteAdvantage" style="color: green; font-weight: bold;background-color: white;">{{ capturedWhiteAdvantage }}</span>
+    </div>
+  </div>
+
+  <!-- Black's captured pieces -->
+  <div *ngIf="capturedBlackIcons.length" style="margin-top: 0.5em; display:block;background-color: white;">
+    <strong>Black's captured:</strong>
+    <div style="margin-top: 0.25em;">
+      <span *ngFor="let icon of capturedBlackIcons" style="font-size: 2em; margin: 0 4px;background-color: white;">{{ icon }}</span>
+      <span *ngIf="capturedBlackAdvantage" style="color: green; font-weight: bold;background-color: white;">{{ capturedBlackAdvantage }}</span>
+    </div>
+  </div>
+
+</div>
+
+
+
+
+
+ <div class="board-wrapper" style="position:relative; width:640px; height:640px;">
+
+
+  <!-- Board -->
+  <div class="board" [style.transform]="myColor === 'black' ? 'rotate(180deg)' : 'none'">
+    <div *ngFor="let sq of boardSquares"
+         class="square"
+         (click)="onSquareClick(sq)"
+         (contextmenu)="onRightClick($event, sq)"
+         [title]="sq"
+          [ngStyle]="getSquareHighlightStyle(sq)">
+      <span class="piece" [style.transform]="myColor === 'black' ? 'rotate(180deg)' : 'none'">
+        {{ renderPieceAt(sq) }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <canvas #arrowCanvas class="arrow-canvas" width="640" height="640"
+          style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+
+  <!-- Promotion Picker -->
+  <div *ngIf="promotionSquare" class="promotion-picker">
+    <p style="margin:0; align-self:center;">Promote to:</p>
+    <button (click)="promotePawn('q')">Queen</button>
+    <button (click)="promotePawn('r')">Rook</button>
+    <button (click)="promotePawn('b')">Bishop</button>
+    <button (click)="promotePawn('n')">Knight</button>
+  </div>
+</div>
+
+<div class="move-controls">
+  <button (click)="prevMove()">◀ Prev</button>
+  <button (click)="nextMove()">Next ▶</button>
+  <button (click)="returnToLive()" *ngIf="isViewingHistory">Return to Live</button>
+</div>
+<div *ngIf="isViewingHistory" class="history-banner">
+  Viewing past move {{ moveIndex + 1 }} of {{ rawMoves.length }}
+  <button (click)="returnToLive()">Return to Live</button>
+</div>
+
+  <!-- Game Info / Timers -->
+  <div class="game-info">
+    <div>
+      <strong>White Time:</strong> {{ formatTimer(whiteTime) }}<br />
+      <strong>Black Time:</strong> {{ formatTimer(blackTime) }}
+    </div>
+
+    <button *ngIf="connected && localGame" (click)="togglePause()">
+      {{ isPaused ? 'Resume Timer' : 'Pause Timer' }}
+    </button>
+
+    <div *ngIf="connected && localGame" class="local-controls">
+      <button (click)="resignLocal('white')">White Resign</button>
+      <button (click)="resignLocal('black')">Black Resign</button>
+    </div>
+    <button (click)="resetArrows()">Reset arrows</button>
+    <button *ngIf="premoves.length" (click)="cancelPremoves()">Cancel All Premoves</button>
+
+
+  </div>
+
+<!-- Draw Offer / Response -->
+<ng-container *ngIf="!pendingDraw && !drawOffered">
+  <button (click)="requestDraw()">Offer Draw</button>
+</ng-container>
+
+<ng-container *ngIf="drawOffered && !pendingDraw">
+  <button disabled>Draw Offered...</button>
+</ng-container>
+
+<ng-container *ngIf="pendingDraw">
+  <button (click)="acceptDraw()">Accept Draw</button>
+  <button (click)="declineDraw()">Decline</button>
+</ng-container>
+<!-- Moves List -->
+<div>
+  <h4>Moves</h4>
+  <ul class="moves-list">
+    <li *ngFor="let m of formattedMoves">{{ m }}</li>
+  </ul>
+</div>
+
+<!-- Online Game Controls -->
+<div *ngIf="connected && !localGame" class="online-controls">
+  <button (click)="handleResignFromMatch()">Resign</button>
+  <button [disabled]="alreadyReported" (click)="reportOpponent()">
+    {{ alreadyReported ? 'Opponent Reported' : 'Report Opponent' }}
+  </button>
+</div>
+</div>
+<!-- Popup -->
+<div *ngIf="showPopup" class="popup">
+  <ng-container *ngIf="popupType === 'in_game'">
+    <p>You are already in a game. Rejoin or Resign?</p>
+    <button (click)="handleRejoin()">Rejoin</button>
+    <button (click)="handleResign()">Resign</button>
+  </ng-container>
+
+  <ng-container *ngIf="popupType === 'game_over'">
+    <p>Game over: {{ gameResultText }}</p>
+    <button *ngIf="previouslyPrivateRoom===false" (click)="playAgain()">Play Again (Rematch)</button>
+    <button (click)="newGame()">New Online Game (Matchmake)</button>
+  </ng-container>
+</div>

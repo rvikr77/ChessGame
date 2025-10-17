@@ -1,0 +1,420 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f5f6fa;
+  color: #2f3640;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-card,
+.private-room,
+.pass-play {
+  margin: 1em 0;
+  padding: 1.2em;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-card:hover,
+.private-room:hover,
+.pass-play:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.profile-card {
+  border: 1px solid #ddd;
+}
+
+.private-room,
+.pass-play {
+  border: 1px dashed #ccc;
+}
+
+
+.loading-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 2em 3em;
+  border-radius: 12px;
+  border: 1px solid #aaa;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  font-weight: bold;
+  text-align: center;
+}
+
+
+.board-wrapper {
+  position: relative;
+  width: 640px;
+  height: 640px;
+  margin: 2em auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+
+.arrow-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  background: transparent;
+  image-rendering: pixelated;
+}
+
+
+.captured-pieces {
+  display: flex;
+  justify-content: space-between;
+  margin: 1em 0;
+}
+
+.captured-pieces div {
+  display: flex;
+  gap: 0.4em;
+  flex-wrap: wrap;
+}
+
+.captured-pieces span {
+  font-weight: bold;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #f0f0f0;
+}
+
+
+.square {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.square:hover {
+  background: rgba(46, 204, 113, 0.15);
+}
+
+.piece {
+  font-size: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.piece:hover {
+  transform: scale(1.1);
+}
+
+
+.promotion-picker {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 2px solid #333;
+  padding: 1em 1.2em;
+  border-radius: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 0.6em;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+
+.moves-list {
+  list-style: none;
+  padding: 0.5em 0;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.moves-list li {
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.moves-list li:hover {
+  background: rgba(52, 152, 219, 0.15);
+}
+
+
+.popup {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 1.5em;
+  border-radius: 12px;
+  border: 1px solid #333;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+
+.conn-indicator {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2000;
+  width: 44px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conn-indicator .bars {
+  display: flex;
+  gap: 3px;
+  align-items: end;
+}
+
+.conn-indicator .bar {
+  width: 6px;
+  border-radius: 3px;
+  background: #bbb;
+  transition: all 250ms ease;
+  opacity: 0.3;
+}
+
+.conn-indicator .b1 {
+  height: 6px;
+}
+
+.conn-indicator .b2 {
+  height: 10px;
+}
+
+.conn-indicator .b3 {
+  height: 15px;
+}
+
+.conn-indicator .b4 {
+  height: 22px;
+}
+
+
+.conn-good .bar {
+  background: #2ecc71;
+  opacity: 1;
+}
+
+.conn-fair .bar {
+  background: #f1c40f;
+  opacity: 0.9;
+}
+
+.conn-poor .bar {
+  background: #e67e22;
+  opacity: 0.9;
+}
+
+.conn-offline .bar {
+  background: #e74c3c;
+  opacity: 1;
+}
+
+
+.conn-indicator[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -28px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+
+.history-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(44, 62, 80, 0.9);
+  color: #ecf0f1;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 50;
+  font-weight: 500;
+}
+
+button {
+  cursor: pointer;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5em 1.2em;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+
+button[style*="color: red"] {
+  background: #e74c3c;
+  color: #fff;
+}
+
+button[style*="color: red"]:hover {
+  background: #c0392b;
+}
+
+button:not([style*="color: red"]) {
+  background: #3498db;
+  color: #fff;
+}
+
+button:not([style*="color: red"]):hover {
+  background: #2980b9;
+}
+
+
+button[disabled] {
+  background: #bdc3c7;
+  color: #7f8c8d;
+  cursor: not-allowed;
+}
+
+
+.move-controls button {
+  background: #1abc9c;
+  color: #fff;
+  margin-right: 0.5em;
+}
+
+.move-controls button:hover {
+  background: #16a085;
+}
+
+
+.local-controls button,
+.online-controls button {
+  background: #9b59b6;
+  color: #fff;
+  margin-right: 0.5em;
+}
+
+.local-controls button:hover,
+.online-controls button:hover {
+  background: #8e44ad;
+}
+
+
+.captured-pieces span {
+  background: #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.captured-pieces span:hover {
+  background: #dff9fb;
+  transform: scale(1.1);
+}
+
+
+.profile-card,
+.private-room,
+.pass-play {
+  border-radius: 12px;
+  padding: 1.5em;
+  transition: all 0.3s ease;
+}
+
+.profile-card:hover,
+.private-room:hover,
+.pass-play:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+body,
+h2,
+h3,
+p,
+div,
+button,
+input,
+select,
+textarea {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+
+input[type="text"],
+input[type="number"],
+input[type="file"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  padding: 0.5em 0.8em;
+  margin: 0.3em 0;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.25s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 6px rgba(52, 152, 219, 0.4);
+}
+
+
+::placeholder {
+  color: #aaa;
+  font-style: italic;
+}
+
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background: #f0f0f0;
+  color: #7f8c8d;
+  cursor: not-allowed;
+}
