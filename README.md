@@ -18,11 +18,16 @@ Cloud Run deployment via Cloud Build. Latency indicators, fault-tolerant matchma
 
 🧱 **Core Libraries**  
 `chess.js`, `ws`, `express`, `passport`, `passport-google-oauth20`, `jsonwebtoken`, `cors`, `dotenv`, `uuid`, `sqlite3`, `express-list-endpoints`  
+
 🧱 Core Database Tables
-`USERS: List of users`,`LIVE_GAMES: Current live games`,`GAME_HISTORY: History of games played`
+- `USERS`: List of users
+- `LIVE_GAMES`: Current live games
+- `GAME_HISTORY`: History of games played
+  
 ✅ **License & Compliance**  
 Educational project. Use libraries per their open-source licenses. Use Google OAuth and other features responsibly respecting privacy laws.  
 
 ⚠️ **Note**  
 SQLite DB is auto-created if missing. Set environment variables securely for OAuth & JWT. Do not use real personal data for testing.  
+
 
