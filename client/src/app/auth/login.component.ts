@@ -20,7 +20,8 @@ import { Router } from '@angular/router';
         <button *ngIf="!auth.loggedIn()" (click)="login()" class="google-btn">
           <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google logo" class="google-icon">
           Continue with Google
-        </button>
+        </button><br>
+        <a href="/privacy-terms.html">Privacy & Terms</a>
       </div>
     </div>
   `,
