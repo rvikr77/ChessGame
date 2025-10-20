@@ -49,7 +49,7 @@ export class PlayComponent implements OnInit, OnDestroy {
   // Arrays to store captured pieces
   capturedWhiteIcons: string[] = [];
   capturedBlackIcons: string[] = [];
-
+  findingMatch = false;
   piecePoints: Record<string, number> = {
     p: 1, n: 3, b: 3, r: 5, q: 9, k: 0
   };
@@ -163,7 +163,7 @@ export class PlayComponent implements OnInit, OnDestroy {
     this.previouslyPrivateRoom = false;
 
     this.initConnectionMonitor();
-
+    this.findingMatch = false;
 
   }
 
@@ -452,7 +452,6 @@ export class PlayComponent implements OnInit, OnDestroy {
     
     if (this.localGame) {
       this.makeMove(from, to, piece);
-      this.executePremoves();
     } else {
       try {
         const tmp = new Chess(this.displayChess.fen());
@@ -848,6 +847,7 @@ export class PlayComponent implements OnInit, OnDestroy {
   // ---------------- Online Game ----------------
 
   play() {
+    this.findingMatch = true;
     this.playService.connectForMatch(this.timeControl, (msg) => this.handleMessages(msg));
   }
 
@@ -1707,7 +1707,7 @@ export class PlayComponent implements OnInit, OnDestroy {
 
       nextIndex = this.moveIndex + 1;
 
-      if (nextIndex > total - 1) {
+      if (nextIndex >= total - 1) {
         this.returnToLive();
         return;
       }

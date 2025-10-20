@@ -53,7 +53,7 @@
       <option value="10">10 min</option>
     </select>
   </label>
-  <button (click)="play()">Find Match</button>
+  <button (click)="play()">Find Match</button> <p *ngIf="findingMatch"> Waiting...</p>
 </div>
 
 <!-- Pass & Play -->
