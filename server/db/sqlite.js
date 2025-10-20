@@ -90,7 +90,7 @@ function initDB() {
     white_time INTEGER NOT NULL DEFAULT 0,
     black_time INTEGER NOT NULL DEFAULT 0,
     last_timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-    reports_per_game TEXT UNIQUE NOT NULL DEFAULT '[]',
+    reports_per_game TEXT NOT NULL DEFAULT '[]',
     lastMoveFrom TEXT,
     lastMoveTo TEXT,
     highlightColor TEXT
@@ -526,7 +526,19 @@ function getUserStatus(email) {
     );
   });
 }
+function updateUserStatus(email, status, suspension_until) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE USERS SET status = ?, suspension_until = ? WHERE email = ?`,
+      [status, suspension_until, email],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.changes > 0);
+      }
+    );
+  });
 
+}
 module.exports = {
   initDB,
   createOrFetchUser,
@@ -543,5 +555,6 @@ module.exports = {
   deleteUser,
   getUserProfile,
   updateElo,
-  reportPlayer
+  reportPlayer,
+  updateUserStatus
 };

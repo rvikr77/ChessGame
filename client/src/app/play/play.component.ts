@@ -163,8 +163,7 @@ export class PlayComponent implements OnInit, OnDestroy {
     this.previouslyPrivateRoom = false;
 
     this.initConnectionMonitor();
-    this.drawOffered = localStorage.getItem('drawOffered') === 'true';
-    this.pendingDraw = localStorage.getItem('pendingDraw') === 'true';
+
 
   }
 
@@ -810,11 +809,16 @@ export class PlayComponent implements OnInit, OnDestroy {
       if (inGame) {
         this.showPopup = true;
         this.showFindMatch = false;
+        this.drawOffered = localStorage.getItem('drawOffered') === 'true';
+        this.pendingDraw = localStorage.getItem('pendingDraw') === 'true';
       }
       else {
         this.showPopup = false;
         this.showFindMatch = true;
-
+        localStorage.removeItem('drawOffered');
+        localStorage.removeItem('pendingDraw');
+        this.drawOffered = false;
+        this.pendingDraw = false;
         this.loadLocalGame();
       }
     });

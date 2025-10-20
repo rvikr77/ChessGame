@@ -776,15 +776,27 @@ function safeParse(json, fallback) {
 
 async function handleCheckStatus(ws, email) {
   const userStatus = await db.getUserStatus(email);
-  if (userStatus) {
-    broadcast(ws, 'status_info', {
-      status: userStatus.status,
-      suspension_until: userStatus.suspension_until
-    });
-    if(userStatus.status==0)
-      await handleForceClose(email);
-  } else {
+  
+  if (!userStatus) {
     broadcast(ws, 'status_info', { error: 'User not found' });
+    return;
+  }
+
+  // If suspension period is over, unsuspend the user
+  if ((userStatus.suspension_until && userStatus.suspension_until <= Date.now()) || (userStatus.status == 0 && !userStatus.suspension_until)) {
+    await db.updateUserStatus(email, 1, null);
+    userStatus.status = 1;
+    userStatus.suspension_until = null;
+  }
+  // Send current status to the user
+  broadcast(ws, 'status_info', {
+    status: userStatus.status,
+    suspension_until: userStatus.suspension_until
+  });
+
+  // If user is suspended, force close their connection
+  if (userStatus.status === 0) {
+    await handleForceClose(email);
   }
 }
 
@@ -857,11 +869,6 @@ async function handleCheckInGame(ws, userEmail) {
   
   broadcast(ws, 'in_game_status', { inGame: !!live });
 
-  
-  setTimeout(() => {
-
-    ws.close();
-  }, 1000); 
 }
 
 function handleWebSocket(ws) {
