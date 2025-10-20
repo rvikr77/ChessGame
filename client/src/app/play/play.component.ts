@@ -340,13 +340,10 @@ export class PlayComponent implements OnInit, OnDestroy {
 
     const piece = this.displayChess.get(square as Square);
 
-
     if (!this.selectedSquare) {
       if (!piece) return;
       if ((piece.color === 'w' && this.myColor !== 'white') ||
-        (piece.color === 'b' && this.myColor !== 'black')) {
-        return;
-      }
+        (piece.color === 'b' && this.myColor !== 'black')) return;
 
       this.selectedSquare = square;
       this.drawMoveHints(square);
@@ -358,14 +355,14 @@ export class PlayComponent implements OnInit, OnDestroy {
     this.selectedSquare = null;
     this.redrawArrows();
 
-
+    // Select another piece of mine
     if (piece && piece.color === this.myColor?.[0]) {
       this.selectedSquare = square;
       this.drawMoveHints(square);
       return;
     }
 
-
+    // Check promotion
     const movingPiece = this.displayChess.get(from as Square);
     const targetRank = to[to.length - 1];
     const isPromotion = movingPiece?.type === 'p' && (
@@ -374,178 +371,123 @@ export class PlayComponent implements OnInit, OnDestroy {
     );
 
     if (isPromotion) {
-      
       this.promotionSquare = { from, to };
       return;
     }
-    if (this.isViewingHistory) {
-      console.warn('Ignoring click while viewing move history');
-      return;
-    }
-   
-    const myColorChar = this.myColor === 'white' ? 'w' : this.myColor === 'black' ? 'b' : null;
-    const isMyTurn = myColorChar === this.displayChess.turn();
 
-    if (!isMyTurn && !this.localGame) {
-      
+    if (this.isViewingHistory) return;
+
+    const myTurn = this.displayChess.turn() === (this.myColor === 'white' ? 'w' : 'b');
+
+    if (!myTurn && !this.localGame) {
+      // Queue premove safely
       this.premoves.push({ from, to });
-      alert(`Premove queued: ${from} → ${to}`);
+      console.log(`🕓 Premove queued: ${from} → ${to}`);
       return;
     }
 
-    
+    // Local game
     if (this.localGame) {
       this.handleSquareClick(from, to);
-    } else {
-      try {
-        const tmp = new Chess(this.displayChess.fen());
-        const applied = tmp.move({ from, to });
-        if (!applied) {
-          
-          return;
-        }
-
-        this.playService.sendMove(
-          applied.san,
-          applied.from,
-          applied.to
-        );
-
-        this.displayChess = tmp;
-        
-        this.currentHintSquare = null;
-        
-        this.arrows = [];
-        this.lastArrowFrom = null;
-        if (this.arrowCanvas) this.redrawArrows();
-        if (this.localGame)
-          this.rawMoves.push(applied.san);
-        this.lastMove.from = applied.from;
-        this.lastMove.to = applied.to;
-        this.executePremoves();
-        this.cdr.detectChanges();
-
-        
-      } catch (e) {
-        console.error('Error validating/sending move', e);
-        
-      }
+      return;
     }
+
+    // Online game → validate before sending
+    const tmp = new Chess(this.displayChess.fen());
+    const legalMove = tmp.moves({ verbose: true }).find(m => m.from === from && m.to === to);
+    if (!legalMove) {
+      console.warn(`Invalid move: ${from} → ${to}`);
+      return;
+    }
+
+    tmp.move({ from, to });
+    this.displayChess = tmp;
+    this.playService.sendMove(legalMove.san, from, to);
+
+    this.lastMove = { from, to };
+    this.arrows = [];
+    this.lastArrowFrom = null;
+    if (this.arrowCanvas) this.redrawArrows();
+    this.executePremoves();
+    this.cdr.detectChanges();
   }
+
 
 
   promotePawn(piece: 'q' | 'r' | 'b' | 'n') {
     if (!this.promotionSquare) return;
     const { from, to } = this.promotionSquare;
-    this.promotionSquare = null; 
+    this.promotionSquare = null;
 
-    const myColorChar = this.myColor === 'white' ? 'w' : this.myColor === 'black' ? 'b' : null;
-    const isMyTurn = myColorChar === this.displayChess.turn();
+    const myTurn = this.displayChess.turn() === (this.myColor === 'white' ? 'w' : 'b');
 
-    
-    if (!isMyTurn) {
+    if (!myTurn) {
       this.premoves.push({ from, to, promotion: piece });
-      alert(`Premove (promotion to ${piece.toUpperCase()}) queued: ${from} → ${to}`);
+      console.log(`🕓 Premove (promotion to ${piece.toUpperCase()}) queued: ${from} → ${to}`);
       return;
     }
 
-    
-    if (this.localGame) {
-      this.makeMove(from, to, piece);
-    } else {
-      try {
-        const tmp = new Chess(this.displayChess.fen());
-        const applied = tmp.move({ from, to, promotion: piece });
-        if (!applied) {
-          alert('Invalid promotion move');
-          return;
-        }
-        if (this.isViewingHistory) {
-          console.warn('Ignoring click while viewing move history');
-          return;
-        }
-        this.playService.sendMove(applied.san, applied.from, applied.to);
-        this.displayChess = tmp;
-        if (this.localGame)
-          this.rawMoves.push(applied.san);
-        this.lastMove.from = applied.from;
-        this.lastMove.to = applied.to;
-        
-        this.arrows = [];
-        this.lastArrowFrom = null;
-        if (this.arrowCanvas) this.redrawArrows();
-        this.cdr.detectChanges();
-
-        this.executePremoves();
-      } catch (e) {
-        console.error('Error performing promotion move', e);
-        alert('Could not promote pawn');
-      }
+    const tmp = new Chess(this.displayChess.fen());
+    const legalMove = tmp.moves({ verbose: true }).find(
+      m => m.from === from && m.to === to && m.promotion === piece
+    );
+    if (!legalMove) {
+      console.warn(`Invalid promotion: ${from} → ${to} (${piece})`);
+      return;
     }
+
+    tmp.move({ from, to, promotion: piece });
+    this.displayChess = tmp;
+
+    if (!this.localGame) this.playService.sendMove(legalMove.san, from, to);
+
+    this.lastMove = { from, to };
+    this.arrows = [];
+    this.lastArrowFrom = null;
+    if (this.arrowCanvas) this.redrawArrows();
+    this.cdr.detectChanges();
+
+    this.executePremoves();
   }
 
 
   // ---------------- Premove Executor ----------------
   private executePremoves() {
-    if (this.isViewingHistory) {
-      this.premoves = [];
-      return;
-    }
-    if (this.premoves.length === 0) return;
-
-    const myColorChar = this.myColor === 'white' ? 'w' : this.myColor === 'black' ? 'b' : null;
-    const isMyTurn = myColorChar === this.displayChess.turn();
-    if (!isMyTurn) return;
+    if (this.isViewingHistory || !this.premoves.length) return;
+    const myTurn = this.displayChess.turn() === (this.myColor === 'white' ? 'w' : 'b');
+    if (!myTurn) return;
 
     const next = this.premoves.shift();
     if (!next) return;
 
     const { from, to, promotion } = next;
+    const tmp = new Chess(this.displayChess.fen());
+    const legalMove = tmp.moves({ verbose: true }).find(
+      m => m.from === from && m.to === to && (!promotion || m.promotion === promotion)
+    );
 
-    try {
-      const tmp = new Chess(this.displayChess.fen());
-      const move = tmp.move({ from, to, promotion });
-      if (!move) {
-        
-        this.premoves = [];
-        alert('Invalid premove. All premoves cleared.');
-        return;
-      }
-
-     
-      if (this.localGame) {
-        this.displayChess = tmp;
-        this.rawMoves.push(move.san);
-        this.lastMove = { from: move.from, to: move.to };
-      } else {
-        if (this.isViewingHistory) {
-          console.warn('Ignoring click while viewing move history');
-          return;
-        }
-        this.playService.sendMove(
-          move.san,
-          move.from,
-          move.to
-        );
-
-        this.displayChess = tmp;
-
-        this.lastMove = { from: move.from, to: move.to };
-        
-        this.arrows = [];
-        this.lastArrowFrom = null;
-        if (this.arrowCanvas) this.redrawArrows();
-      }
-
-      this.redrawArrows();
-      this.cdr.detectChanges();
-
-     
-      setTimeout(() => this.executePremoves(), 100);
-    } catch (e) {
-      console.warn('Failed to execute premove', next, e);
-      this.premoves = []; 
+    if (!legalMove) {
+      console.warn('Invalid premove skipped:', from, to, promotion);
+      setTimeout(() => this.executePremoves(), 50);
+      return;
     }
+
+    tmp.move({ from, to, promotion });
+    this.displayChess = tmp;
+
+    if (!this.localGame) {
+      this.playService.sendMove(legalMove.san, from, to);
+    } else {
+      this.rawMoves.push(legalMove.san);
+    }
+
+    this.lastMove = { from, to };
+    this.arrows = [];
+    this.lastArrowFrom = null;
+    if (this.arrowCanvas) this.redrawArrows();
+    this.cdr.detectChanges();
+
+    setTimeout(() => this.executePremoves(), 100);
   }
 
 
@@ -1294,54 +1236,62 @@ export class PlayComponent implements OnInit, OnDestroy {
   private makeMove(from: string, to: string, promotion?: string): boolean {
     if (!this.displayChess) return false;
     if (this.isViewingHistory) {
-      console.warn('Ignoring click while viewing move history');
+      console.warn('Ignoring move while viewing history');
       return false;
     }
+
     try {
-      
-      const move = this.displayChess.move({ from, to, promotion });
-      if (!move) {
+      // Validate move first using Chess.js legal moves
+      const moves = this.displayChess.moves({ verbose: true });
+      const legalMove = moves.find(
+        m => m.from === from && m.to === to && (!promotion || m.promotion === promotion)
+      );
+
+      if (!legalMove) {
+        console.warn(`Invalid move attempted: ${from} → ${to}`);
         alert('Invalid move');
         return false;
       }
 
-     
+      // Apply move safely
+      const move = this.displayChess.move({ from, to, promotion });
+
+      if (!move) {
+        console.error('Failed to apply move despite validation:', from, to, promotion);
+        alert('Could not perform move');
+        return false;
+      }
+
+      // Update move history
       this.rawMoves.push(move.san);
+      this.lastMove = { from: move.from, to: move.to };
 
-      
-      this.lastMove.from = move.from;
-      this.lastMove.to = move.to;
-
+      // Clear arrows & redraw
       this.arrows = [];
       if (this.arrowCanvas) this.redrawArrows();
 
+      // Capture icons
       if (move.captured) {
         if (move.color === 'w') {
-          
           this.capturedBlackIcons.push(this.mapBlack[move.captured] || '');
         } else {
-          
           this.capturedWhiteIcons.push(this.mapWhite[move.captured] || '');
         }
-
         this.updateCapturedIcons(this.capturedWhiteIcons, this.capturedBlackIcons);
       }
 
-      
+      // Local game logic
       if (this.localGame) {
-        
         if (this.displayChess !== this.localGame) {
           try {
             this.localGame.move({ from, to, promotion });
           } catch (e) {
-            console.warn('Warning: could not apply move to localGame (fallback).', e);
+            console.warn('Could not apply move to localGame fallback', e);
           }
         }
 
-        
         const justMoved = move.color === 'w' ? 'white' : 'black';
 
-        
         if (this.displayChess.isCheckmate()) {
           this.endLocalGame(`${justMoved === 'white' ? 'White' : 'Black'} wins by checkmate`);
           return true;
@@ -1362,29 +1312,18 @@ export class PlayComponent implements OnInit, OnDestroy {
           this.endLocalGame('Draw');
           return true;
         }
-        if (move.san.includes('+'))
-          alert('Check!');
-        
+
+        if (move.san.includes('+')) alert('Check!');
         this.myColor = this.myColor === 'white' ? 'black' : 'white';
-        
+
         this.currentHintSquare = null;
         this.saveLocalGame();
         this.cdr.detectChanges();
         return true;
-
       } else {
-        
-        
-        
-        this.playService.sendMove(
-          move.san,
-          move.from,
-          move.to
-        );
-
-        
+        // Online game → send move
+        this.playService.sendMove(move.san, move.from, move.to);
         this.currentHintSquare = null;
-
         this.redrawArrows();
         this.cdr.detectChanges();
         return true;
@@ -1395,6 +1334,8 @@ export class PlayComponent implements OnInit, OnDestroy {
       return false;
     }
   }
+
+
 
 
   resignLocal(side: 'white' | 'black') {
