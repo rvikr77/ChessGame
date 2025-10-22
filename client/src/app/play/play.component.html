@@ -199,8 +199,10 @@
   </ng-container>
 
   <ng-container *ngIf="popupType === 'game_over'">
+    <button class="close-btn" (click)="closePopup()">✖</button>
     <p>Game over: {{ gameResultText }}</p>
     <button *ngIf="previouslyPrivateRoom===false" (click)="playAgain()">Play Again (Rematch)</button>
     <button (click)="newGame()">New Online Game (Matchmake)</button>
+    <br><p *ngIf="findingMatch"> Waiting...</p>
   </ng-container>
 </div>

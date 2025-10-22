@@ -5,7 +5,20 @@ body {
   margin: 0;
   padding: 0;
 }
+.close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #555;
+}
 
+.close-btn:hover {
+  color: #000;
+}
 .profile-card,
 .private-room,
 .pass-play {
