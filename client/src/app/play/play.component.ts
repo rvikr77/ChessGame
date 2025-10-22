@@ -318,7 +318,9 @@ export class PlayComponent implements OnInit, OnDestroy {
     this.redrawArrows();
   }
 
-
+  closePopup() {
+    this.showPopup = false;
+  }
 
 
 
