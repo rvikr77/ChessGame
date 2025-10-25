@@ -164,7 +164,7 @@ export class PlayComponent implements OnInit, OnDestroy {
 
     this.initConnectionMonitor();
     this.findingMatch = false;
-
+    this.cancelPremoves();
   }
 
   ngOnDestroy() {
@@ -1099,7 +1099,7 @@ export class PlayComponent implements OnInit, OnDestroy {
   handleResign() {
     this.showPopup = false;
     this.playService.connectForResign();
-    this.showFindMatch = true;
+    this.showFindMatch = false;
 
     setTimeout(() => {
       this.loadProfile();
@@ -1144,7 +1144,7 @@ export class PlayComponent implements OnInit, OnDestroy {
   // ---------------- Match options ----------------
 
   playAgain() {
-    this.showFindMatch = false;
+    this.showFindMatch = true;
     if (this.previousgametype === 'local') {
       
       this.clearLocalGame();
@@ -1171,7 +1171,7 @@ export class PlayComponent implements OnInit, OnDestroy {
 
   newGame() {
     
-    this.showFindMatch = false;
+    this.showFindMatch = true;
     this.play();
   }
 

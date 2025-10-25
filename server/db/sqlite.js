@@ -204,72 +204,89 @@ function getUserElo(email) {
   });
 }
 
+/**
+ * Saves the game state to the database.
+ * This function is "promisified" to work with async/await in handleMove.
+ * @param {object} game - The game state object.
+ * @returns {Promise<void>} A promise that resolves when the game is saved.
+ */
 function saveLiveGame(game) {
-  const {
-    game_id,
-    player_white,
-    player_black,
-    fen,
-    last_move,
-    moves,
-    time_control,
-    turn,
-    positions,
-    white_time,
-    black_time,
-    last_timestamp,
-    lastMoveFrom,
-    lastMoveTo,
-    highlightColor,
-    isRated 
-  } = game;
+  // Return a promise to make this function await-able
+  return new Promise((resolve, reject) => {
+    const {
+      game_id,
+      player_white,
+      player_black,
+      fen,
+      last_move,
+      moves,
+      time_control,
+      turn,
+      positions,
+      white_time,
+      black_time,
+      last_timestamp,
+      lastMoveFrom,
+      lastMoveTo,
+      highlightColor,
+      isRated,
+    } = game;
 
-  const movesStr = Array.isArray(moves) ? JSON.stringify(moves) : JSON.stringify([moves]);
-  const positionsStr =
-    typeof positions === "object" ? JSON.stringify(positions) : JSON.stringify(defaultPositions());
+    const movesStr = Array.isArray(moves) ? JSON.stringify(moves) : JSON.stringify([moves]);
+    const positionsStr =
+      typeof positions === "object" ? JSON.stringify(positions) : JSON.stringify(defaultPositions());
 
-  db.get(
-    `SELECT reports_per_game, isRated FROM LIVE_GAMES WHERE game_id = ?`,
-    [game_id],
-    (err, row) => {
-      if (err) {
-        console.error("Failed to fetch existing game:", err);
-        return;
+    db.get(
+      `SELECT reports_per_game, isRated FROM LIVE_GAMES WHERE game_id = ?`,
+      [game_id],
+      (err, row) => {
+        if (err) {
+          console.error("Failed to fetch existing game:", err);
+          return reject(err); // Reject the promise on error
+        }
+
+        const reportsPerGame = row ? row.reports_per_game : "[]";
+        const currentIsRated = row ? row.isRated : 1;
+
+        const finalIsRated = (isRated !== undefined && isRated !== null) ? isRated : currentIsRated;
+
+        db.run(
+          `INSERT OR REPLACE INTO LIVE_GAMES
+           (game_id, player_white, player_black, fen, last_move, moves, time_control, turn, positions,
+            white_time, black_time, last_timestamp, reports_per_game, lastMoveFrom, lastMoveTo, highlightColor, isRated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            game_id,
+            player_white,
+            player_black,
+            fen,
+            last_move,
+            movesStr,
+            time_control,
+            turn,
+            positionsStr,
+            white_time ?? time_control * 60*1000,
+            black_time ?? time_control * 60*1000,
+            last_timestamp ?? Date.now(),
+            reportsPerGame,
+            lastMoveFrom,
+            lastMoveTo,
+            highlightColor,
+            finalIsRated,
+          ],
+          // Add a callback to db.run to handle completion
+          (runErr) => {
+            if (runErr) {
+              console.error("Failed to INSERT OR REPLACE game:", runErr);
+              return reject(runErr); // Reject the promise on error
+            }
+            // On success, resolve the promise
+            resolve();
+          }
+        );
       }
-
-      const reportsPerGame = row ? row.reports_per_game : "[]";
-      const currentIsRated = row ? row.isRated : 1; 
-
-      
-      const finalIsRated = (isRated !== undefined && isRated !== null) ? isRated : currentIsRated;
-
-      db.run(
-        `INSERT OR REPLACE INTO LIVE_GAMES
-        (game_id, player_white, player_black, fen, last_move, moves, time_control, turn, positions,
-         white_time, black_time, last_timestamp, reports_per_game, lastMoveFrom, lastMoveTo, highlightColor, isRated)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          game_id,
-          player_white,
-          player_black,
-          fen,
-          last_move,
-          movesStr,
-          time_control,
-          turn,
-          positionsStr,
-          white_time ?? time_control * 60,
-          black_time ?? time_control * 60,
-          last_timestamp ?? Math.floor(Date.now() / 1000),
-          reportsPerGame,
-          lastMoveFrom,
-          lastMoveTo,
-          highlightColor,
-          finalIsRated, 
-        ]
-      );
-    }
-  );
+    );
+  });
 }
 
 function defaultPositions() {

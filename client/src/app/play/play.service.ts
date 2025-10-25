@@ -224,21 +224,6 @@ export class PlayService {
   }
 
  
-startPassAndPlay(time: number, onMessage: (msg: any) => void) {
-  
-  const fakeGameStart = {
-    type: 'game_start',
-    data: {
-      gameId: 'local-' + Date.now(), 
-      white: 'Player 1',
-      black: 'Player 2',
-      time
-    }
-  };
-
-
-  setTimeout(() => onMessage(fakeGameStart), 100);
-}
 
 
   connectForResign() {

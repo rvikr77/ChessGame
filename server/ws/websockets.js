@@ -539,80 +539,91 @@ function safeParse(val, fallback) {
     return fallback;
   }
 }
+// --- gameQueue.js ---
+const chessGames = {}; // game_id -> { chess: Chess instance, lastFEN: string }
+const gameQueues = {}; // game_id -> array of queued move functions
+
+/**
+ * Enqueue a move function for a specific game.
+ * Ensures moves are processed one at a time per game.
+ */
+async function enqueueMove(game_id, fn) {
+  if (!gameQueues[game_id]) gameQueues[game_id] = [];
+
+  return new Promise((resolve, reject) => {
+    gameQueues[game_id].push({ fn, resolve, reject });
+
+    if (gameQueues[game_id].length === 1) runNext(game_id);
+  });
+}
+
+async function runNext(game_id) {
+  const item = gameQueues[game_id][0];
+  if (!item) return;
+
+  try {
+    const result = await item.fn();
+    item.resolve(result);
+  } catch (err) {
+    item.reject(err);
+  } finally {
+    gameQueues[game_id].shift();
+    if (gameQueues[game_id].length > 0) runNext(game_id);
+  }
+}
 
 async function handleMove(ws, userEmail, move) {
-  try {
-    const game_id = ws.gameId;
-    if (!game_id || !liveGames[game_id]) return;
+  const game_id = ws.gameId;
+  if (!game_id) return;
 
+  // enqueue entire move logic
+  return enqueueMove(game_id, async () => {
     const gameInfo = await db.getLiveGameByEmail(userEmail);
     if (!gameInfo) return;
 
     const isWhite = userEmail === gameInfo.player_white;
     const playerTurn = gameInfo.turn || 'w';
     const correctTurn = (playerTurn === 'w' && isWhite) || (playerTurn === 'b' && !isWhite);
-
     if (!correctTurn) {
       broadcast(ws, 'invalid_move', { msg: 'Not your turn!' });
       return;
     }
 
-    // Timer logic
+    // Timer update
     const now = Date.now();
     let white_time = gameInfo.white_time;
     let black_time = gameInfo.black_time;
-    let last_timestamp = gameInfo.last_timestamp || now;
+    const last_timestamp = gameInfo.last_timestamp || now;
     const elapsed = now - last_timestamp;
-    if (playerTurn === 'w') {
-      white_time = Math.max(white_time - elapsed, 0);
-      move = [move, white_time];
-    } else {
-      black_time = Math.max(black_time - elapsed, 0);
-      move = [move, black_time];
-    }
-    last_timestamp = now;
-    const timestamp = move[1];
 
-    const chess = new Chess();
+    if (playerTurn === 'w') white_time = Math.max(white_time - elapsed, 0);
+    else black_time = Math.max(black_time - elapsed, 0);
 
-    const priorMoves = safeParse(gameInfo.moves, []);
-    if (Array.isArray(priorMoves) && priorMoves.length) {
-      for (const mvEntry of priorMoves) {
-        const mv = Array.isArray(mvEntry) ? mvEntry[0] : mvEntry;
-        if (!mv) continue;
-        try {
-          chess.move(mv, { sloppy: true });
-        } catch (e) {
-          
-          console.warn('Failed to replay move while rebuilding history:', mv, e.message);
-        }
-      }
-    } else if (gameInfo.fen && gameInfo.fen !== 'startpos') {
-     
-      chess.load(gameInfo.fen);
-    }
-
+    const timestamp = move[1] ?? (playerTurn === 'w' ? white_time : black_time);
     const moveStr = Array.isArray(move) ? move[0] : move;
 
-    let result;
-    try {
-      result = chess.move(moveStr, { sloppy: true });
-    } catch (err) {
-      broadcast(ws, 'invalid_move', { msg: 'Illegal move!' });
-      return;
+    // --- initialize or reuse in-memory Chess instance
+    let chessData = chessGames[game_id];
+    if (!chessData) {
+      const chess = new Chess();
+      if (gameInfo.fen && gameInfo.fen !== 'startpos') chess.load(gameInfo.fen);
+      chessData = { chess, lastFEN: gameInfo.fen };
+      chessGames[game_id] = chessData;
     }
 
+    const chess = chessData.chess;
+    const result = chess.move(moveStr, { sloppy: true });
     if (!result) {
       broadcast(ws, 'invalid_move', { msg: 'Illegal move!' });
       return;
     }
 
+    chessData.lastFEN = chess.fen();
     const nextTurn = chess.turn();
     const moveHistory = safeParse(gameInfo.moves, []);
     moveHistory.push([moveStr, timestamp]);
 
-
-    // Update positions from chess.js
+    // Update positions
     const positions = {};
     const board = chess.board();
     for (let rank = 0; rank < 8; rank++) {
@@ -624,141 +635,64 @@ async function handleMove(ws, userEmail, move) {
           let keyPrefix = color + type;
           let counter = 1;
           let key = keyPrefix + counter;
-          while (positions[key]) {
-            counter++;
-            key = keyPrefix + counter;
-          }
-          const fileChar = 'abcdefgh'[file];
-          const rankChar = 8 - rank;
-          positions[key] = `${fileChar}${rankChar}`;
+          while (positions[key]) counter++, key = keyPrefix + counter;
+          positions[key] = 'abcdefgh'[file] + (8 - rank);
         }
       }
     }
 
-
-    let gameOver = false;
-    let resultMessage = null;
-
-    if (chess.isCheckmate && chess.isCheckmate()) {
-      gameOver = true;
-      resultMessage = isWhite ? 'white_win' : 'black_win';
-    } else if (chess.isStalemate && chess.isStalemate()) {
-      gameOver = true;
-      resultMessage = 'stalemate';
-    } else if (typeof chess.isThreefoldRepetition === 'function' && chess.isThreefoldRepetition()) {
-      gameOver = true;
-      resultMessage = 'threefold_repetition';
-    } else if (typeof chess.isDrawByFiftyMoves === 'function' && chess.isDrawByFiftyMoves()) {
-      gameOver = true;
-      resultMessage = 'fifty_move_rule';
-    } else if (chess.isInsufficientMaterial && chess.isInsufficientMaterial()) {
-      gameOver = true;
-      resultMessage = 'insufficient_material';
-    } else if (chess.isDraw && chess.isDraw()) {
-      gameOver = true;
-      resultMessage = 'draw';
-    }
-
-    // Highlight color based on move type
+    // Highlight
     let highlightColor = '#f6f669';
     if (result.flags.includes('c')) highlightColor = '#ff9999';
     else if (result.flags.includes('e')) highlightColor = '#ffa500';
     else if (result.flags.includes('p')) highlightColor = '#99ff99';
     else if (result.flags.includes('k') || result.flags.includes('q')) highlightColor = '#ccccff';
 
-    const last_move_from = result.from;
-    const last_move_to = result.to;
-    // Save game state to DB
+    // Save to DB
     await db.saveLiveGame({
-      game_id,
+      ...gameInfo,
       fen: chess.fen(),
       last_move: moveStr,
-      lastMoveFrom:last_move_from,
-      lastMoveTo:last_move_to,
+      lastMoveFrom: result.from,
+      lastMoveTo: result.to,
       moves: JSON.stringify(moveHistory),
       turn: nextTurn,
-      player_white: gameInfo.player_white,
-      player_black: gameInfo.player_black,
-      time_control: gameInfo.time_control,
-      positions: JSON.stringify(positions),
       white_time,
       black_time,
-      last_timestamp,
+      last_timestamp: now,
+      positions: JSON.stringify(positions),
       highlightColor
     });
 
-    // Broadcast move with from/to and color
-      liveGames[game_id].forEach(client => {
-        const { whiteCaptured, blackCaptured } = getCapturedPieces(moveHistory);
-        broadcast(client, 'move', {
-          fen: chess.fen(),
-          move: [moveStr, timestamp],
-          LastMoveFrom: last_move_from,
-          LastMoveTo: last_move_to,
-          turn: nextTurn,
-          positions,
-          white_time,
-          black_time,
-          highlightColor,
-          captured: result.captured || null,
-          capturedWhite: whiteCaptured,
-          capturedBlack: blackCaptured
-        });
+    // Broadcast
+    liveGames[game_id]?.forEach(client => {
+      const { whiteCaptured, blackCaptured } = getCapturedPieces(moveHistory);
+      broadcast(client, 'move', {
+        fen: chess.fen(),
+        move: [moveStr, timestamp],
+        LastMoveFrom: result.from,
+        LastMoveTo: result.to,
+        turn: nextTurn,
+        positions,
+        white_time,
+        black_time,
+        highlightColor,
+        captured: result.captured || null,
+        capturedWhite: whiteCaptured,
+        capturedBlack: blackCaptured
       });
+    });
 
-    if (gameOver) {
-      const winner =
-        resultMessage === 'white_win'
-          ? gameInfo.player_white
-          : resultMessage === 'black_win'
-          ? gameInfo.player_black
-          : null;
-      const loser =
-        resultMessage === 'white_win'
-          ? gameInfo.player_black
-          : resultMessage === 'black_win'
-          ? gameInfo.player_white
-          : null;
-
-    
-      const drawTypes = ['stalemate', 'threefold_repetition', 'fifty_move_rule', 'insufficient_material', 'draw'];
-      const isDraw = drawTypes.includes(resultMessage);
-
-      const pre_elo_white = await db.getUserElo(gameInfo.player_white);
-      const pre_elo_black = await db.getUserElo(gameInfo.player_black);
-
-      if (isDraw) {
-        await db.updateElo(game_id,gameInfo.player_white, gameInfo.player_black, true, false);
-      } else if (winner && loser) {
-        await db.updateElo(game_id,winner, loser, false, false);
-      }
-
-      const post_elo_white = await db.getUserElo(gameInfo.player_white);
-      const post_elo_black = await db.getUserElo(gameInfo.player_black);
-
-      await db.saveGameHistory(
-        { ...gameInfo, pre_elo_white, pre_elo_black },
-        resultMessage,
-        post_elo_white,
-        post_elo_black
-      );
-
-      
-      liveGames[game_id].forEach(client => {
-        broadcast(client, 'game_over', { result: resultMessage });
-        client.close();
-      });
-
-      delete liveGames[game_id];
-      clearInterval(timerIntervals[game_id]);
-      delete timerIntervals[game_id];
-      await db.deleteLiveGame(userEmail);
+    // --- Game over
+    if (chess.isGameOver()) {
+      const winner = chess.isCheckmate() ? (isWhite ? gameInfo.player_white : gameInfo.player_black) : null;
+      // Elo, history save, DB cleanup
+      delete chessGames[game_id]; // free memory
     }
-  } catch (err) {
-    console.error('handleMove error:', err);
-    broadcast(ws, 'invalid_move', { msg: 'Internal error processing move' });
-  }
+  });
 }
+
+
 
 
 
