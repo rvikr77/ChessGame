@@ -641,6 +641,28 @@ async function handleMove(ws, userEmail, move) {
       }
     }
 
+    let gameOver = false;
+    let resultMessage = null;
+
+    if (chess.isCheckmate && chess.isCheckmate()) {
+      gameOver = true;
+      resultMessage = isWhite ? 'white_win' : 'black_win';
+    } else if (chess.isStalemate && chess.isStalemate()) {
+      gameOver = true;
+      resultMessage = 'stalemate';
+    } else if (typeof chess.isThreefoldRepetition === 'function' && chess.isThreefoldRepetition()) {
+      gameOver = true;
+      resultMessage = 'threefold_repetition';
+    } else if (typeof chess.isDrawByFiftyMoves === 'function' && chess.isDrawByFiftyMoves()) {
+      gameOver = true;
+      resultMessage = 'fifty_move_rule';
+    } else if (chess.isInsufficientMaterial && chess.isInsufficientMaterial()) {
+      gameOver = true;
+      resultMessage = 'insufficient_material';
+    } else if (chess.isDraw && chess.isDraw()) {
+      gameOver = true;
+      resultMessage = 'draw';
+    }
     // Highlight
     let highlightColor = '#f6f669';
     if (result.flags.includes('c')) highlightColor = '#ff9999';
@@ -699,10 +721,53 @@ async function handleMove(ws, userEmail, move) {
 
 
     // --- Game over
-    if (chess.isGameOver()) {
-      const winner = chess.isCheckmate() ? (isWhite ? gameInfo.player_white : gameInfo.player_black) : null;
-      // Elo, history save, DB cleanup
-      delete chessGames[game_id]; // free memory
+    if (gameOver) {
+      const winner =
+        resultMessage === 'white_win'
+          ? gameInfo.player_white
+          : resultMessage === 'black_win'
+            ? gameInfo.player_black
+            : null;
+      const loser =
+        resultMessage === 'white_win'
+          ? gameInfo.player_black
+          : resultMessage === 'black_win'
+            ? gameInfo.player_white
+            : null;
+
+
+      const drawTypes = ['stalemate', 'threefold_repetition', 'fifty_move_rule', 'insufficient_material', 'draw'];
+      const isDraw = drawTypes.includes(resultMessage);
+
+      const pre_elo_white = await db.getUserElo(gameInfo.player_white);
+      const pre_elo_black = await db.getUserElo(gameInfo.player_black);
+
+      if (isDraw) {
+        await db.updateElo(game_id, gameInfo.player_white, gameInfo.player_black, true, false);
+      } else if (winner && loser) {
+        await db.updateElo(game_id, winner, loser, false, false);
+      }
+
+      const post_elo_white = await db.getUserElo(gameInfo.player_white);
+      const post_elo_black = await db.getUserElo(gameInfo.player_black);
+
+      await db.saveGameHistory(
+        { ...gameInfo, pre_elo_white, pre_elo_black },
+        resultMessage,
+        post_elo_white,
+        post_elo_black
+      );
+
+
+      liveGames[game_id].forEach(client => {
+        broadcast(client, 'game_over', { result: resultMessage });
+        client.close();
+      });
+
+      delete liveGames[game_id];
+      clearInterval(timerIntervals[game_id]);
+      delete timerIntervals[game_id];
+      await db.deleteLiveGame(userEmail);
     }
   });
 }
