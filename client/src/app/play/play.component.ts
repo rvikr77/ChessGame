@@ -909,6 +909,7 @@ export class PlayComponent implements OnInit, OnDestroy {
   requestDraw() {
     if(this.localGame){
       this.endLocalGame('Draw by agreement');
+      this.findingMatch = false;
     }
     else{
     if (!this.connected) return;
