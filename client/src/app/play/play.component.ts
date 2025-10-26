@@ -1067,7 +1067,12 @@ export class PlayComponent implements OnInit, OnDestroy {
     if (msg.type === 'game_start' || msg.type === 'rejoin') {
       this.localGame = null;
       this.previousgametype = 'online';
-      
+      if(msg.type === 'game_start' ){
+        localStorage.removeItem('drawOffered');
+        localStorage.removeItem('pendingDraw');
+        this.drawOffered = false;
+        this.pendingDraw = false;
+      }
       this.handleFullGameState(msg.data);
       this.showFindMatch = false;
 
