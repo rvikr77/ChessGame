@@ -599,7 +599,7 @@ async function handleMove(ws, userEmail, move) {
     if (playerTurn === 'w') white_time = Math.max(white_time - elapsed, 0);
     else black_time = Math.max(black_time - elapsed, 0);
 
-    const timestamp = move[1] ?? (playerTurn === 'w' ? white_time : black_time);
+    const timestamp =  (playerTurn === 'w' ? white_time : black_time);
     const moveStr = Array.isArray(move) ? move[0] : move;
 
     // --- initialize or reuse in-memory Chess instance
