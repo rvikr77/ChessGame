@@ -1588,29 +1588,44 @@ export class PlayComponent implements OnInit, OnDestroy {
     const total = this.rawMoves.length;
     if (total === 0) {
       this.jumpToMove(this.MOVE_START);
-      this.isViewingHistory = false; 
+      this.isViewingHistory = false;
       return;
     }
 
     let targetIndex: number;
 
-
     if (this.moveIndex === this.MOVE_LIVE) {
-      targetIndex = total - 2;
-    }
-
-    else if (this.moveIndex <= 0) {
-      
+      targetIndex = total > 1 ? total - 2 : this.MOVE_START; // <-- fix here
+    } else if (this.moveIndex <= 0) {
       targetIndex = this.MOVE_START;
-    }
-
-    else {
+    } else {
       targetIndex = this.moveIndex - 1;
     }
 
-    
     this.jumpToMove(targetIndex);
   }
+
+  nextMove() {
+    if (this.navLock) return;
+    this.cancelPremoves();
+    const total = this.rawMoves.length;
+    if (total === 0) return;
+
+    // If already live, nothing to do
+    if (this.moveIndex === this.MOVE_LIVE) return;
+
+    let nextIndex = this.moveIndex === this.MOVE_START ? 0 : this.moveIndex + 1;
+
+    // If nextIndex reaches total, go to live immediately
+    if (nextIndex >= total-1) {
+      this.returnToLive();
+      return;
+    }
+
+    this.jumpToMove(nextIndex);
+  }
+
+
 
 
 
@@ -1666,40 +1681,6 @@ export class PlayComponent implements OnInit, OnDestroy {
   }
 
 
-  nextMove() {
-    if (this.navLock) {
-      console.warn('nextMove ignored (navLock)');
-      return;
-    }
-    this.cancelPremoves();
-    const total = this.rawMoves.length;
-    if (total === 0) {
-
-      return;
-    }
-
-    let nextIndex = this.moveIndex;
-
-    if (this.moveIndex === this.MOVE_LIVE) {
-
-      
-      return;
-    } else if (this.moveIndex === this.MOVE_START) {
-
-      nextIndex = 0;
-    } else {
-
-      nextIndex = this.moveIndex + 1;
-
-      if (nextIndex >= total - 1) {
-        this.returnToLive();
-        return;
-      }
-    }
-
-    
-    this.jumpToMove(nextIndex);
-  }
 
 
   returnToLive() {
