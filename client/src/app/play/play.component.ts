@@ -1028,7 +1028,7 @@ export class PlayComponent implements OnInit, OnDestroy {
       if (msg.data.fen) {
         this.displayChess = new Chess(msg.data.fen);
         if (this.displayChess.inCheck())
-          alert('Check!');
+          //alert('Check!');
         this.lastMove.from = msg.data.LastMoveFrom || null;
         this.lastMove.to = msg.data.LastMoveTo || null;
         this.lastMoveColor = msg.data.highlightColor || null;

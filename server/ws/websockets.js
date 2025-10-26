@@ -668,7 +668,7 @@ async function handleMove(ws, userEmail, move) {
 
     // --- Verify save consistency ---
     const verifyGame = await db.getLiveGameByEmail(userEmail);
-    console.log('before ', newFEN,'\nafter', verifyGame.fen);
+    //console.log('before ', newFEN,'\nafter', verifyGame.fen);
     if (!verifyGame || verifyGame.fen !== newFEN) {
       // Rollback local chess state if needed
       chess.undo();
