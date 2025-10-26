@@ -649,13 +649,15 @@ async function handleMove(ws, userEmail, move) {
     else if (result.flags.includes('k') || result.flags.includes('q')) highlightColor = '#ccccff';
 
     // Save to DB
+    const newFEN = chess.fen();
+    const newMoves = JSON.stringify(moveHistory);
     await db.saveLiveGame({
       ...gameInfo,
-      fen: chess.fen(),
+      fen: newFEN,
       last_move: moveStr,
       lastMoveFrom: result.from,
       lastMoveTo: result.to,
-      moves: JSON.stringify(moveHistory),
+      moves: newMoves,
       turn: nextTurn,
       white_time,
       black_time,
@@ -664,11 +666,23 @@ async function handleMove(ws, userEmail, move) {
       highlightColor
     });
 
-    // Broadcast
+    // --- Verify save consistency ---
+    const verifyGame = await db.getLiveGameByEmail(userEmail);
+    console.log('before ', newFEN,'\nafter', verifyGame.fen);
+    if (!verifyGame || verifyGame.fen !== newFEN) {
+      // Rollback local chess state if needed
+      chess.undo();
+      chessData.lastFEN = gameInfo.fen;
+      console.log('sent invalid');
+      broadcast(ws, 'invalid_move', { msg: 'Move rejected due to concurrent update. Please retry.' });
+      return;
+    }
+
+    // Broadcast (only if consistent)
     liveGames[game_id]?.forEach(client => {
       const { whiteCaptured, blackCaptured } = getCapturedPieces(moveHistory);
       broadcast(client, 'move', {
-        fen: chess.fen(),
+        fen: newFEN,
         move: [moveStr, timestamp],
         LastMoveFrom: result.from,
         LastMoveTo: result.to,
@@ -683,6 +697,7 @@ async function handleMove(ws, userEmail, move) {
       });
     });
 
+
     // --- Game over
     if (chess.isGameOver()) {
       const winner = chess.isCheckmate() ? (isWhite ? gameInfo.player_white : gameInfo.player_black) : null;
@@ -691,6 +706,7 @@ async function handleMove(ws, userEmail, move) {
     }
   });
 }
+
 
 
 
