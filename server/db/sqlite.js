@@ -339,7 +339,7 @@ function getHistoryByEmail(email) {
     db.all(`
       SELECT * FROM GAME_HISTORY
       WHERE player_white = ? OR player_black = ?
-      ORDER BY timestamp`, [email, email], (err, rows) => {
+      ORDER BY timestamp DESC`, [email, email], (err, rows) => {
       if (err) return reject(err);
       resolve(rows);
     });
